@@ -1,5 +1,6 @@
 #!/usr/bin/bash
 set -euo pipefail
+set -v
 
 # Move to the project root and load the configured tool versions.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,16 +13,29 @@ LOADER_DIR="$PWD/nvidia-linux-vbios-vix-loader-${NVBIOS_LOADER_VERSION}"
 DRIVER_VERSION="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1)"
 DRIVER_SOURCE="/usr/src/nvidia-${DRIVER_VERSION}"
 PAYLOAD="${1:-$PWD/zotac-3090-blower-nvflash-fan-2000-loader.bin}"
+# The editor's JSON files are manifests, not firmware payloads.
+if [[ "$PAYLOAD" == *.json ]]; then
+	echo "Pass the editor's -loader.bin file, not its JSON manifest: $PAYLOAD" >&2
+	exit 1
+fi
 PAYLOAD="$(realpath "$PAYLOAD")"
 
-# Prepare and enroll the 3090 payload, then build and enable its boot entry.
-# Setup checks existing enrollment and stops if other enrolled GPUs need decisions.
-PAYLOAD_SHA256="$(sha256sum "$PAYLOAD" | cut -d ' ' -f 1)"
-sudo "$LOADER_DIR/nvbios" system setup --progress \
-	--repository "$LOADER_DIR" \
-	--kernel "$(uname -r)" --userspace pacman \
-	--device 0000:07:00.0 "$PAYLOAD" "$PAYLOAD_SHA256" \
-	--driver-source "$DRIVER_SOURCE"
+# Prepare a fresh profile for the 3090 and the current boot configuration.
+# Enrollment replaces the complete GPU profile; this setup contains one GPU.
+PROFILE_PARENT="$(mktemp -d "$PWD/gpu-profile-XXXXXX")"
+PROFILE_DIR="$PROFILE_PARENT/profile"
+sudo "$LOADER_DIR/nvbios" system prepare \
+	--device 0000:07:00.0 "$PAYLOAD" \
+	--driver-source "$DRIVER_SOURCE" \
+	--userspace pacman --output "$PROFILE_DIR"
+
+# Pause automatic rebuilds before replacing the existing READY profile.
+sudo /usr/local/bin/nvbios system pre-install
+sudo /usr/local/bin/nvbios system enroll --profile "$PROFILE_DIR/profile.json"
+
+# Build and enable the new boot entry.
+sudo /usr/local/bin/nvbios system reconcile --kernel "$(uname -r)"
+sudo /usr/local/bin/nvbios system enable --kernel "$(uname -r)"
 
 # Show readiness; runtime application can be checked after reboot.
 sudo /usr/local/bin/nvbios system status
