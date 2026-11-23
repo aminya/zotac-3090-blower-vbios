@@ -7,19 +7,29 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 source ./src/versions.bash
 
+# Require a relocated loader payload, rather than a ROM or JSON manifest.
+PAYLOAD="${1:-$PWD/zotac-3090-blower-nvflash-fan-2000-loader.bin}"
+if [[ "$PAYLOAD" != *-loader.bin ]]; then
+	echo "Pass an Ampere -loader.bin payload, not a ROM or JSON manifest: $PAYLOAD" >&2
+	if [[ "$PAYLOAD" == *.rom ]]; then
+		CANDIDATE="${PAYLOAD%.rom}-loader.bin"
+		if [[ -f "$CANDIDATE" ]]; then
+			echo "Matching payload: $CANDIDATE" >&2
+		fi
+	fi
+	exit 1
+fi
+if [[ ! -f "$PAYLOAD" || ! -s "$PAYLOAD" ]]; then
+	echo "Payload is missing or empty: $PAYLOAD" >&2
+	exit 1
+fi
+PAYLOAD="$(realpath "$PAYLOAD")"
+
 # Download the loader and locate the matching NVIDIA driver source.
 ./src/download.bash
 LOADER_DIR="$PWD/nvidia-linux-vbios-vix-loader-${NVBIOS_LOADER_VERSION}"
 DRIVER_VERSION="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1)"
 DRIVER_SOURCE="/usr/src/nvidia-${DRIVER_VERSION}"
-PAYLOAD="${1:-$PWD/zotac-3090-blower-nvflash-fan-2000-loader.bin}"
-# The editor's JSON files are manifests, not firmware payloads.
-if [[ "$PAYLOAD" == *.json ]]; then
-	echo "Pass the editor's -loader.bin file, not its JSON manifest: $PAYLOAD" >&2
-	exit 1
-fi
-PAYLOAD="$(realpath "$PAYLOAD")"
-
 # Prepare a fresh profile for the 3090 and the current boot configuration.
 # Enrollment replaces the complete GPU profile; this setup contains one GPU.
 PROFILE_PARENT="$(mktemp -d "$PWD/gpu-profile-XXXXXX")"
