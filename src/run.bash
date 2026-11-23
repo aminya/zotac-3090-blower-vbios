@@ -18,3 +18,5 @@ if [[ ! -d "./nvflash" ]]; then
 	rm "./nvflash_${NVFLASH_VERSION}_linux.zip"
 	chmod +x "./nvflash/x64/nvflash"
 fi
+
+sudo "nvflash/x64/nvflash" --list
