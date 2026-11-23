@@ -1,26 +1,14 @@
 #!/usr/bin/bash
 set -euo pipefail
 
-# Set tool versions and move to the project root.
-NVBIOS_VERSION=0.1.46
-NVFLASH_VERSION=5.867
+# move to the project root.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
-# Download the VBIOS editor if needed.
-if [[ ! -d "./nvidia-vbios-vix-editor-${NVBIOS_VERSION}" ]]; then
-	curl -LJO "https://github.com/Panchovix/nvidia-vbios-vix-editor/releases/download/v${NVBIOS_VERSION}/nvidia-vbios-vix-editor-${NVBIOS_VERSION}-linux-x86_64.tar.gz"
-	tar -xzf "./nvidia-vbios-vix-editor-${NVBIOS_VERSION}-linux-x86_64.tar.gz"
-	rm "./nvidia-vbios-vix-editor-${NVBIOS_VERSION}-linux-x86_64.tar.gz"
-fi
+source "./src/versions.bash"
 
-# Download NVFlash if needed.
-if [[ ! -d "./nvflash" ]]; then
-	curl -LJO "https://us8-dl.techpowerup.com/files/ijA4sRs02bghkI_DA4C94g/1795441984/nvflash_${NVFLASH_VERSION}_linux.zip"
-	unzip "./nvflash_${NVFLASH_VERSION}_linux.zip" -d "./nvflash"
-	rm "./nvflash_${NVFLASH_VERSION}_linux.zip"
-	chmod +x "./nvflash/x64/nvflash"
-fi
+# Download
+./src/download.bash
 
 # Choose the NVFlash index and preserve the existing sysfs dump.
 NVFLASH_INDEX="${1:-}"

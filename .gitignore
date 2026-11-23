@@ -1,6 +1,9 @@
 nvbios
 nvidia-vbios-vix-editor-*/
+nvidia-linux-vbios-vix-loader-*/
 nvflash/
+*.bin
 *.zip
 *.gz
 *.rom
+/*.json
