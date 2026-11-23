@@ -23,6 +23,10 @@ if [[ ! -f "$PAYLOAD" || ! -s "$PAYLOAD" ]]; then
 	echo "Payload is missing or empty: $PAYLOAD" >&2
 	exit 1
 fi
+if ! command -v jq >/dev/null 2>&1; then
+	echo "jq is required to configure boot generation retention." >&2
+	exit 1
+fi
 PAYLOAD="$(realpath "$PAYLOAD")"
 
 # Download the loader and locate the matching NVIDIA driver source.
@@ -39,6 +43,9 @@ sudo "$LOADER_DIR/nvbios" system prepare \
 	--driver-source "$DRIVER_SOURCE" \
 	--userspace pacman --output "$PROFILE_DIR"
 
+# Retain the current override and one older generation after a successful boot.
+sudo sh -c 'jq ".retain_boot_generations = 2" "$1" > "$1.tmp" && mv -- "$1.tmp" "$1"' sh "$PROFILE_DIR/profile.json"
+
 # Pause automatic rebuilds before replacing the existing READY profile.
 sudo /usr/local/bin/nvbios system pre-install
 sudo /usr/local/bin/nvbios system enroll --profile "$PROFILE_DIR/profile.json"
@@ -53,3 +60,4 @@ sudo /usr/local/bin/nvbios system status
 # Reboot manually after reviewing the loader status.
 echo "Loader configured. Reboot to use the new boot entry."
 echo "After reboot, run: sudo /usr/local/bin/nvbios system status"
+echo "The loader prunes older generations after a matching boot; check its retention warnings."
