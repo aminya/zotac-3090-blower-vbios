@@ -1,0 +1,19 @@
+#!/bin/bash
+# Experimental build hook; do not install into production initramfs yet.
+
+build() {
+    local source_dir=${GBR_SOURCE_DIR:?set GBR_SOURCE_DIR to the reviewed resize checkout}
+    local binary
+
+    add_file "$source_dir/scripts/geforce-bar1-resize" /usr/local/sbin/geforce-bar1-resize 755 || return 1
+    add_file "$source_dir/systemd/geforce-bar1-resize-initrd.service" /usr/lib/systemd/system/geforce-bar1-resize-initrd.service 644 || return 1
+    add_file "$source_dir/config/zotac-3090-initrd.conf.example" /etc/geforce-bar1-resize.conf 644 || return 1
+    add_symlink /usr/lib/systemd/system/sysinit.target.wants/geforce-bar1-resize-initrd.service ../geforce-bar1-resize-initrd.service || return 1
+    for binary in bash setpci sed cat date basename readlink mkdir grep sort awk tr sleep id sha256sum cut rm mv find wc tail uname dmesg; do
+        add_binary "$binary" || return 1
+    done
+}
+
+help() {
+    echo 'Experimental scoped BAR1 resize; requires systemd and gpu_unlock in the image.'
+}

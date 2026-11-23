@@ -1,0 +1,22 @@
+# Experimental initramfs-only integration; not installed by install.sh.
+# Experimental udev ordering and firmware lookup require an isolated boot test.
+[Unit]
+Description=Experimental GPU unlock and BAR1 resize before NVIDIA
+DefaultDependencies=no
+After=systemd-journald.socket
+Before=systemd-modules-load.service systemd-udevd.service systemd-udev-trigger.service
+ConditionKernelCommandLine=geforce_bar1_initrd=1
+ConditionPathExists=/etc/geforce-bar1-resize.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/modprobe gpu_unlock
+ExecStart=/usr/local/sbin/geforce-bar1-resize boot --card 10de:2204/19da:1625
+RemainAfterExit=yes
+TimeoutStartSec=60
+KillMode=mixed
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=sysinit.target

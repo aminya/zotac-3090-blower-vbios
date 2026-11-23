@@ -8,3 +8,5 @@ nvflash/
 *.rom
 /*.json
 *.jpg
+rebar-boot-work/
+release-staging/

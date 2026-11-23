@@ -1,86 +1,131 @@
-# Zotac RTX 3090 blower VBIOS fan profile
+# RTX 3090 Blower VBIOS
 
-Give the Zotac RTX 3090 blower a quieter idle while keeping its automatic fan
-curve. This profile lowers the stored minimum and first curve point on both fan
-channels from 3,000 RPM / 60% to 1,000 RPM / 10%, and moves the first curve
-temperature from 55°C to 45°C so the fan begins ramping earlier. Higher curve
-points and extra curves remain unchanged.
+Quiet Fan and Resizable BAR support for the Zotac RTX 3090 blower on Linux.
 
-On the card used for this project, LACT reported around **500 RPM at idle** and
-an earlier ramp under load after the 45°C change. Actual fan speed and cooling
-depend on the card and environment; check fan startup and temperatures on your
-own system.
+## Features
 
-## Observed load run
+- **Resizable BAR:** an experimental boot profile exposes a 32 GiB BAR1 aperture without flashing the GPU.
+- **Fan curve:** lowers idle fan settings and starts the automatic fan ramp at 45°C.
+- **GPU unlock:** supports the `gpu-unlock` kernel module and its firmware for the tested Ampere card.
+- **Recovery:** keeps the existing boot entry available as a fallback.
 
-In this approximately two-minute LACT capture, the blower ramped from about
-500 RPM to 2,052 RPM while power draw reached 349.6 W. The recorded peaks were
-63°C GPU, 74°C hotspot and 67°C VRAM. LACT reported the software power cap in
-the displayed throttling status. This is one short run on one card; it does
-not establish startup reliability or sustained performance in every workload.
+## Tested hardware
+
+- GPU: Zotac RTX 3090 blower, `10de:2204/19da:1625`.
+- PCI address: `0000:07:00.0`.
+- NVIDIA open driver: `620.73.04`.
+- ReBAR: Linux allocated 32 GiB BAR1 and LACT reported enabled on one test boot.
+- Fan: LACT reported around 500 RPM at idle with the edited profile.
+- Full CPU access to VRAM, repeat boots, sustained workloads and other cards remain unverified.
+
+The scripts and PCI IDs are specific to this configuration. Check your card and paths before use. Keep a backup of the original ROM and a working boot entry. Do not flash the edited ROM.
+
+## Fan curve
+
+Both fan channels use these settings:
+
+| Setting | Original | Profile |
+| --- | --- | --- |
+| Minimum speed | 3,000 RPM | 1,000 RPM |
+| Minimum level | 60% | 10% |
+| First curve temperature | 55°C | 45°C |
+| First curve speed | 3,000 RPM | 1,000 RPM |
+| First curve level | 60% | 10% |
+
+- Higher curve points and extra curves remain unchanged.
+- Actual fan speed and cooling depend on the card and environment.
+- Verify physical fan startup, GPU temperature, hotspot and VRAM temperature under sustained load.
+
+### Create and load
+
+1. Back up the original ROM with `src/extract.bash` or the `src/extract-tty3.bash` console workflow. Check the NVFlash adapter index first; the tested card used index 0. The save required unloaded NVIDIA modules and `iomem=relaxed` on this system.
+2. Create the profile and its relocated loader payload:
+
+   ```bash
+   bash ./src/edit.bash ORIGINAL.rom EDITED.rom
+   ```
+
+3. Load the generated `EDITED-loader.bin` as an in-memory VBIOS override:
+
+   ```bash
+   bash ./src/load.bash ./EDITED-loader.bin
+   ```
+
+4. Reboot and inspect the loader and fan behavior:
+
+   ```bash
+   sudo nvbios system status
+   journalctl -k -b | rg -i 'vbios.override|vbios_override'
+   ```
+
+- The loader retains two override generations. It checks hashes of managed GRUB entries; do not rename or delete them directly.
+- Matching module parameters do not by themselves prove the fan settings took effect.
+
+### Observed load run
+
+- Duration: approximately two minutes.
+- Fan: about 500 to 2,052 RPM.
+- Peak power: 349.6 W.
+- Peak temperatures: GPU 63°C, hotspot 74°C, VRAM 67°C.
+- LACT reported the software power cap in the displayed throttling status.
+- This short run does not establish startup reliability or sustained performance.
 
 ![LACT history showing fan speed, temperatures, clocks and power under load](docs/images/lact-fan-profile.png)
 
-The scripts back up the card's VBIOS, create the profile with the VBIOS Vix
-Editor CLI, and prepare an **in-memory override** with the Linux VBIOS Vix
-Loader. Keep the original ROM and normal boot entry for recovery. Do not flash
-the edited copy.
+## Resizable BAR
 
-## Back up the original
+The ReBAR profile uses a separate initramfs and GRUB entry. It performs a volatile PCI resize before the NVIDIA driver loads; it does not flash the VBIOS. The 32 GiB aperture is not additional physical VRAM.
 
-The Zotac card was identified at PCI address `0000:07:00.0`, NVFlash index 0.
-Indices can change, so check the adapter listing before selecting the card.
-`src/extract.bash` uses NVFlash's read-only `--save` command. NVFlash required
-`iomem=relaxed` on this system and requires the NVIDIA modules to be unloaded
-for the save. `src/extract-tty3.bash` provides the console workflow; save work
-before stopping the graphical session. Preserve the NVFlash ROM separately.
+### Requirements
 
-## Create the fan profile
+- Arch-style `mkinitcpio`, systemd, `lsinitcpio`, `cpio`, `zstd`, `setpci` and GRUB tools.
+- A known-working loader-managed initramfs containing `gpu_unlock`, its firmware, the patched NVIDIA modules and the fan override.
+- A [geforce-bar1-resize](https://github.com/noon-at-cgn/geforce-bar1-resize) checkout. The builder checks that its script has SHA-256 `da12bcbb3bc4811264695ce1e0dd24aea340cb3a6ba27f03a44d76bec051d737`.
+- The checkout defaults to `~/GitHub/geforce-bar1-resize-rebar-work`; pass another path as the builder’s fourth argument.
+- Review the card address and IDs in `src/rebar/` before building.
 
-```bash
-bash ./src/edit.bash ORIGINAL.rom EDITED.rom
-```
+### Build
 
-Arguments are optional: the defaults are `zotac-3090-blower-nvflash.rom` and
-`zotac-3090-blower-nvflash-1000rpm-10pct-45deg.rom`. Choose a new output name
-if a previous copy exists. The script calls the editor's `edit` command and
-exports `EDITED-loader.bin` using its `ampere-relocated-v1` representation.
-It sets the same values for fan channels 1 and 2:
-
-| Field | Value |
-| --- | --- |
-| Minimum speed | 1,000 RPM |
-| Minimum level | 10% |
-| Curve point 1 temperature | 45°C |
-| Curve point 1 speed | 1,000 RPM |
-| Curve point 1 level | 10% |
-
-The temperature is supplied in °C; the editor stores it as 1,440 units of
-1/32°C. Other fan curve points and extra curves are left as in the input ROM.
-
-## Load and check
+Copy the current **known-working managed** initramfs and GRUB entry to a private directory. The generation below is an example from the tested system; identify yours from `/proc/cmdline` and loader status.
 
 ```bash
-bash ./src/load.bash ./EDITED-loader.bin
+install -d -m 700 rebar-boot-work
+sudo install -m 600 -o "$(id -u)" -g "$(id -g)" \
+  /boot/nvidia-vbios/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7/initramfs.img \
+  rebar-boot-work/fallback-initramfs.img
+sudo install -m 600 -o "$(id -u)" -g "$(id -g)" \
+  /boot/grub/nvidia-vbios-entries/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7.cfg \
+  rebar-boot-work/fallback.cfg
+bash src/build-rebar.bash rebar-boot-work/fallback-initramfs.img \
+  rebar-boot-work/fallback.cfg rebar-boot-work/build-1
 ```
 
-The loader builds an NVIDIA open kernel module and a separate GRUB entry for
-the 3090. The project used driver 620.73.04; the loader's support depends on
-the driver and kernel. The script sets retention to two override generations.
-Reboot after successful setup, then inspect the running configuration:
+- The builder appends a compressed archive, checks its contents and creates a separate GRUB entry. It does not modify `/boot`.
+- `lsinitcpio` may show only the first archive; the builder checks the appended archive independently.
+- Review `rebar-test.cfg` and `SHA256SUMS` in the output directory.
+
+### Install and test
 
 ```bash
-sudo nvbios system status
-journalctl -k -b | rg -i 'vbios.override|vbios_override'
+sudo bash src/install-rebar.bash rebar-boot-work/build-1
 ```
 
-Matching module parameters and a staged payload do not by themselves prove
-the fan settings took effect. Observe the physical blower and LACT's RPM,
-GPU, hotspot and VRAM temperatures. On this card the 1,000 RPM / 10% settings
-reported about 500 RPM at idle; lowering point 1 to 45°C produced an earlier
-ramp in a short workload. Confirm startup from a cold boot and monitor sustained
-workloads. Use the normal boot entry if the fan stalls or cooling is inadequate.
+- Installation checks the fallback image hash and refuses to overwrite `/boot/grub/custom.cfg` or an existing test image.
+- Confirm your GRUB configuration sources `custom.cfg` and check the saved default with `sudo grub-editenv /boot/grub/grubenv list`.
+- Reboot and select **CachyOS NVIDIA ReBAR test (experimental)**.
+- Check `/proc/cmdline`, `lspci -vv -s 07:00.0`, LACT and `nvidia-smi` after boot.
+- If there is a problem, reboot into the existing VBIOS override or normal entry.
+- Keep the fallback image and entry until recovery and workloads are tested.
+- The optional `RMForceStaticBar1=0` setting was not used in the successful test boot.
 
-The loader checks hashes of its managed GRUB entries. Do not rename or delete
-them directly; retention can remove old generations after a matching boot and
-subsequent reconciliation.
+## GPU unlock
+
+- Install the AUR firmware and DKMS packages with `paru` or `yay`:
+
+  ```bash
+  bash src/install-gpu-unlock.bash
+  ```
+
+- Run the script as a normal user; the AUR helper requests elevated privileges when needed.
+- Package installation alone does not enable the unlock. Follow the [gpu-unlock project](https://github.com/Zagitta/gpu-unlock) for boot configuration, initramfs rebuilds and verification.
+- The tested boot used `gpu_unlock.targets=all`; review its effect on all supported GPUs before using that setting.
