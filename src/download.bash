@@ -34,3 +34,8 @@ if [[ ! -d "./nvflash" ]]; then
 	rm "./nvflash_${NVFLASH_VERSION}_linux.zip"
 	chmod +x "./nvflash/x64/nvflash"
 fi
+
+# Install mokutil
+if ! command -v "mokutil" >/dev/null 2>&1; then
+	sudo pacman -S mokutil
+fi
