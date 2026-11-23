@@ -1,3 +1,5 @@
 nvbios
 nvidia-vbios-vix-editor-*/
 nvflash/
+*.zip
+*.gz
