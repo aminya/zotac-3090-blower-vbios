@@ -21,8 +21,8 @@ if [[ ! -d "./nvidia-vbios-vix-editor-${NVBIOS_VERSION}" ]]; then
 fi
 
 # Download the VBIOS loader if needed.
-if [[ ! -d "./nvidia-linux-vbios-vix-loader" ]]; then
-	curl -LJ -o "./nvidia-linux-vbios-vix-loader.tar.gz" "https://github.com/Panchovix/nvidia-linux-vbios-vix-loader/archive/8a6b9e3b21a96f86684dd0131d5bec73cd9adfd4.tar.gz"
+if [[ ! -d "./nvidia-linux-vbios-vix-loader-${NVBIOS_LOADER_VERSION}" ]]; then
+	curl -LJ -o "./nvidia-linux-vbios-vix-loader.tar.gz" "https://github.com/Panchovix/nvidia-linux-vbios-vix-loader/archive/${NVBIOS_LOADER_VERSION}.tar.gz"
 	tar -xzf "./nvidia-linux-vbios-vix-loader.tar.gz"
 	rm "./nvidia-linux-vbios-vix-loader.tar.gz"
 fi
