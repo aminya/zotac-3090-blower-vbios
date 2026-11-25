@@ -8,8 +8,8 @@ base_cfg=${2:?missing fallback GRUB configuration}
 output=${3:?missing new output directory}
 resize_dir=${4:-$HOME/GitHub/geforce-bar1-resize-rebar-work}
 kernel=${REBAR_KERNEL:-$(uname -r)}
-entry_id=${REBAR_ENTRY_ID:-rebar-3090-test}
-boot_dir=${REBAR_BOOT_DIR:-nvidia-vbios-rebar-test}
+entry_id=${REBAR_ENTRY_ID:-rebar-3090-$kernel}
+boot_dir=${REBAR_BOOT_DIR:-nvidia-vbios-rebar-$kernel}
 [[ $kernel =~ ^[A-Za-z0-9._+-]+$ && $entry_id =~ ^[A-Za-z0-9._-]+$ && $boot_dir =~ ^[A-Za-z0-9._-]+$ ]] || {
 	echo 'Invalid kernel, entry ID or boot directory' >&2
 	exit 1
@@ -80,8 +80,8 @@ awk -v entry_id="$entry_id" -v boot_dir="$boot_dir" -v kernel="$kernel" '
   /^[[:space:]]*linux / { print $0 " geforce_bar1_initrd=1"; next }
   /^[[:space:]]*initrd / { print "    initrd /boot/" boot_dir "/initramfs.img"; next }
   { print }
-' "$base_cfg" >"$output/rebar-test.cfg"
-grub-script-check "$output/rebar-test.cfg"
+' "$base_cfg" >"$output/rebar.cfg"
+grub-script-check "$output/rebar.cfg"
 sha256sum "$base_image" "$output/initramfs.img" >"$output/SHA256SUMS"
 cp -- "$base_cfg" "$output/fallback.cfg"
 printf 'Built %s\nFallback entry copied to %s\n' "$output/initramfs.img" "$output/fallback.cfg"

@@ -45,11 +45,19 @@ Both fan channels use these settings:
    bash ./src/edit.bash ORIGINAL.rom EDITED.rom
    ```
 
-3. Load the generated `EDITED-loader.bin` as an in-memory VBIOS override:
+3. Load the generated `EDITED-loader.bin` as an in-memory VBIOS override. With no kernel argument, this uses the running kernel:
 
    ```bash
    bash ./src/load.bash ./EDITED-loader.bin
    ```
+
+   To build overrides for multiple installed kernels, list their full releases. The first is selected by the loader:
+
+   ```bash
+   bash ./src/load.bash ./EDITED-loader.bin 7.3.5-2-cachyos-bore 7.3.3-2-cachyos-bore
+   ```
+
+   Use your installed kernel releases and ensure matching headers and NVIDIA DKMS dependencies are installed. The script uses the installed `/usr/local/bin/nvbios`; the loader must support the kernels and GRUB configuration on the machine. Some kernels and boot configurations require the local loader's GRUB parsing and Clang LTO fixes.
 
 4. Reboot and inspect the loader and fan behavior:
 
@@ -58,7 +66,10 @@ Both fan channels use these settings:
    journalctl -k -b | rg -i 'vbios.override|vbios_override'
    ```
 
-- The loader retains two override generations. It checks hashes of managed GRUB entries; do not rename or delete them directly.
+- Enrollment replaces the existing GPU profile. The script removes the kernel-package restriction and retains two generations for one selected kernel or three for multiple kernels.
+- Retention is global across kernels, not per kernel. After a matching boot, verify that every desired entry remains available; custom ReBAR entries can also prevent removal of referenced generations.
+- The loader checks hashes of managed GRUB entries; do not rename or delete them directly.
+- After changing the VBIOS override or kernel, rebuild and install a separate ReBAR entry for each kernel. The loader does not update those images automatically.
 - Matching module parameters do not by themselves prove the fan settings took effect.
 
 ### Observed load run
@@ -84,35 +95,39 @@ The ReBAR profile uses a separate initramfs and GRUB entry. It performs a volati
 - The checkout defaults to `~/GitHub/geforce-bar1-resize-rebar-work`; pass another path as the builder’s fourth argument.
 - Review the card address and IDs in `src/rebar/` before building.
 
-### Build
+### Build for each kernel
 
-Copy the current **known-working managed** initramfs and GRUB entry to a private directory. The generation below is an example from the tested system; identify yours from `/proc/cmdline` and loader status.
+Copy that kernel's **known-working managed** initramfs and GRUB entry to a private directory. Identify its generation from `sudo nvbios system status` and `/boot/grub/nvidia-vbios-entries/`. Repeat with a different output directory for every kernel.
 
 ```bash
-install -d -m 700 rebar-boot-work
+kernel=7.3.5-2-cachyos-bore
+generation=vbios-7.3.5-2-cachyos-bore-REPLACE_WITH_YOUR_GENERATION
+install -d -m 700 "rebar-boot-work/$kernel-input"
 sudo install -m 600 -o "$(id -u)" -g "$(id -g)" \
-	/boot/nvidia-vbios/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7/initramfs.img \
-	rebar-boot-work/fallback-initramfs.img
+	"/boot/nvidia-vbios/$generation/initramfs.img" \
+	"rebar-boot-work/$kernel-input/fallback-initramfs.img"
 sudo install -m 600 -o "$(id -u)" -g "$(id -g)" \
-	/boot/grub/nvidia-vbios-entries/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7.cfg \
-	rebar-boot-work/fallback.cfg
-bash src/build-rebar.bash rebar-boot-work/fallback-initramfs.img \
-	rebar-boot-work/fallback.cfg rebar-boot-work/build-1
+	"/boot/grub/nvidia-vbios-entries/$generation.cfg" \
+	"rebar-boot-work/$kernel-input/fallback.cfg"
+REBAR_KERNEL="$kernel" bash src/build-rebar.bash \
+	"rebar-boot-work/$kernel-input/fallback-initramfs.img" \
+	"rebar-boot-work/$kernel-input/fallback.cfg" "rebar-boot-work/$kernel-build"
 ```
 
 - The builder appends a compressed archive, checks its contents and creates a separate GRUB entry. It does not modify `/boot`.
 - `lsinitcpio` may show only the first archive; the builder checks the appended archive independently.
-- Review `rebar-test.cfg` and `SHA256SUMS` in the output directory.
+- Review `rebar.cfg` and `SHA256SUMS` in the output directory.
+- The default entry ID and image directory include the kernel release. `REBAR_ENTRY_ID` and `REBAR_BOOT_DIR` can override them when another generation must coexist.
 
-### Install and test
+### Install and verify
 
 ```bash
-sudo bash src/install-rebar.bash rebar-boot-work/build-1
+sudo bash src/install-rebar.bash "rebar-boot-work/$kernel-build"
 ```
 
-- Installation checks the fallback image hash and refuses to overwrite `/boot/grub/custom.cfg` or an existing test image.
+- Installation verifies the fallback entry and image, preserves and backs up existing custom entries, and refuses to overwrite an existing ReBAR image or entry ID.
 - Confirm your GRUB configuration sources `custom.cfg` and check the saved default with `sudo grub-editenv /boot/grub/grubenv list`.
-- Reboot and select **CachyOS NVIDIA ReBAR test (experimental)**.
+- Reboot and select **CachyOS NVIDIA ReBAR (kernel release)**. The saved default is not changed by installation.
 - Check `/proc/cmdline`, `lspci -vv -s 07:00.0`, LACT and `nvidia-smi` after boot.
 - If there is a problem, reboot into the existing VBIOS override or normal entry.
 - Keep the fallback image and entry until recovery and workloads are tested.
