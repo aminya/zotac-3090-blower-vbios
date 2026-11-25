@@ -10,3 +10,6 @@ nvflash/
 *.jpg
 rebar-boot-work/
 release-staging/
+gpu-profile-*/
+gpu-profile/
+
