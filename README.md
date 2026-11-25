@@ -24,13 +24,13 @@ The scripts and PCI IDs are specific to this configuration. Check your card and 
 
 Both fan channels use these settings:
 
-| Setting | Original | Profile |
-| --- | --- | --- |
-| Minimum speed | 3,000 RPM | 1,000 RPM |
-| Minimum level | 60% | 10% |
-| First curve temperature | 55°C | 45°C |
-| First curve speed | 3,000 RPM | 1,000 RPM |
-| First curve level | 60% | 10% |
+| Setting                 | Original  | Profile   |
+| ----------------------- | --------- | --------- |
+| Minimum speed           | 3,000 RPM | 1,000 RPM |
+| Minimum level           | 60%       | 10%       |
+| First curve temperature | 55°C      | 45°C      |
+| First curve speed       | 3,000 RPM | 1,000 RPM |
+| First curve level       | 60%       | 10%       |
 
 - Higher curve points and extra curves remain unchanged.
 - Actual fan speed and cooling depend on the card and environment.
@@ -91,13 +91,13 @@ Copy the current **known-working managed** initramfs and GRUB entry to a private
 ```bash
 install -d -m 700 rebar-boot-work
 sudo install -m 600 -o "$(id -u)" -g "$(id -g)" \
-  /boot/nvidia-vbios/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7/initramfs.img \
-  rebar-boot-work/fallback-initramfs.img
+	/boot/nvidia-vbios/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7/initramfs.img \
+	rebar-boot-work/fallback-initramfs.img
 sudo install -m 600 -o "$(id -u)" -g "$(id -g)" \
-  /boot/grub/nvidia-vbios-entries/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7.cfg \
-  rebar-boot-work/fallback.cfg
+	/boot/grub/nvidia-vbios-entries/vbios-7.3.5-2-cachyos-bore-8377e268df255622cfa7.cfg \
+	rebar-boot-work/fallback.cfg
 bash src/build-rebar.bash rebar-boot-work/fallback-initramfs.img \
-  rebar-boot-work/fallback.cfg rebar-boot-work/build-1
+	rebar-boot-work/fallback.cfg rebar-boot-work/build-1
 ```
 
 - The builder appends a compressed archive, checks its contents and creates a separate GRUB entry. It does not modify `/boot`.
